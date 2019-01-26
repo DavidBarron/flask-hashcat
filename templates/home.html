@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Home</title>
+    <style>
+    h1 {text-align:center;}
+    p {text-align:center;}
+    </style>
+</head>
+<body>
+    <h1>SpyCloud Challenge</h1>
+    <p>The goal of this assignment is to crack a small set of hashed passwords using MD5</p>
+    <p></p>
+    {% if message %}
+        <p>{{ message }}</p>
+    {% else %}
+        <p>Please select a txt file to upload</p>
+    {% endif %}
+    <form method=post enctype=multipart/form-data>
+      <p><input type=file name=file>
+         <input type=submit value=Upload>
+    </form>
+    <p>- or -</p>
+    <form method=get action="/entries">
+      <p><input type=submit value='View Past Runs'>
+    </form>
+
+</body>
+</html>
