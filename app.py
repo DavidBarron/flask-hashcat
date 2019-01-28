@@ -240,23 +240,25 @@ def process_file_streamed_response(upload_file_dest, filename):
     return Response(stream_with_context(generate()))
 
 
-@app.route('/', methods=['GET', 'POST'])
-def upload_file():
-    if request.method == 'POST':
-        if 'file' not in request.files:
-            return render_template(HOME_PAGE)
-        file = request.files['file']
-        if not file:
-            return render_template(HOME_PAGE, message='Could not fetch file, please try again')
-        elif file.filename == '':
-            return render_template(HOME_PAGE, message='Empty file name, please try again')
-        elif not allowed_file(file.filename):
-            return render_template(HOME_PAGE, message='Only txt files are allowed, please try again')
-        else:
-            upload_file_dest, upload_filename = upload_hash_file(file)
-            return process_file_streamed_response(upload_file_dest, upload_filename)
+@app.route('/', methods=['GET'])
+def home(message=None):
+    return render_template(HOME_PAGE, message=message)
 
-    return render_template(HOME_PAGE)
+
+@app.route('/', methods=['POST'])
+def upload_file():
+    if 'file' not in request.files:
+        return home()
+    file = request.files['file']
+    if not file:
+        return home(message='Could not fetch file, please try again')
+    elif file.filename == '':
+        return home(message='Empty file name, please try again')
+    elif not allowed_file(file.filename):
+        return home(message='Only txt files are allowed, please try again')
+    else:
+        upload_file_dest, upload_filename = upload_hash_file(file)
+        return process_file_streamed_response(upload_file_dest, upload_filename)
 
 
 @app.route('/entries', methods=['GET'])
