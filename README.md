@@ -12,7 +12,6 @@ brew install redis
 
 ### Before first run of app (or python script only to clear database at any point)
 ```
-redis-server # run in seperate window
 python3 -m venv venv
 . venv/bin/activate
 pip3 install -r requirements.txt
@@ -24,7 +23,9 @@ Also, download rockyou.txt from link and place file in /word_lists: https://wiki
 
 ### Running from command line
 ```
+redis-server # run in seperate window
 . venv/bin/activate
+python3 hashcat_worker.py
 flask run
 ```
 
