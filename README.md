@@ -21,11 +21,21 @@ deactivate
 Also, download rockyou.txt from link and place file in /word_lists: https://wiki.skullsecurity.org/Passwords
 
 
-### Running from command line
+### Running app
+Start redis server
+
 ```
-redis-server # run in seperate window
+redis-server
+```
+In separate window, start worker to listen to redis queue
+```
 . venv/bin/activate
 python3 hashcat_worker.py
+```
+Finally, in another window start the Flask app
+
+```
+. venv/bin/activate
 flask run
 ```
 
