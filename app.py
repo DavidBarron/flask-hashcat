@@ -7,12 +7,10 @@ import datetime
 import subprocess
 import os
 import sqlite3
-import threading
 
 DB = 'spy_challenge.db'
 
 HOME_PAGE = 'home.html'
-RESULTS_HEADER_PAGE = 'results_header.html'
 RESULTS_HISTORY_HEADER_PAGE = 'results_history_header.html'
 RESULTS_ENTRY_PAGE = 'results_entry.html'
 
@@ -25,9 +23,7 @@ POTFILE = '/Users/davidbarron/.hashcat/hashcat.potfile'
 
 app = Flask(__name__)
 
-HASH_LOCK = threading.Lock()  # hashcat is pretty resource intensive, want to only be processing 1 file at a time
-
-q = Queue(connection=conn)
+q = Queue('queue_hashcat', connection=conn)
 
 # CREATE TABLE tEntry
 # (
@@ -220,7 +216,6 @@ FUNCTIONS = [
 
 def process_file(upload_file_dest, upload_filename):
     print("Processing file...")
-    #HASH_LOCK.acquire()
     try:
         clear_hashcat_potfile()
         status_text = ''
@@ -235,12 +230,8 @@ def process_file(upload_file_dest, upload_filename):
                 break
         status_text += 'DONE\n'
         update_db_entry(upload_filename, 1, status_text)
-    # except Exception:
-    #     print("Something went wrong in file processing...")
-    #     print(str(Exception))
     finally:
         print("Done processing file")
-        #HASH_LOCK.release()
 
 
 @app.route('/', methods=['GET'])
@@ -249,7 +240,7 @@ def home(message=None):
 
 
 @app.route('/', methods=['POST'])
-def upload_file():
+def post_file():
     if 'file' not in request.files:
         return home()
     file = request.files['file']
@@ -261,11 +252,9 @@ def upload_file():
         return home(message='Only txt files are allowed, please try again')
     else:
         upload_file_dest, upload_filename = upload_hash_file(file)
-        job = q.enqueue_call(func=process_file, args=(upload_file_dest, upload_filename), result_ttl=5000)
+        job = q.enqueue(f=process_file, args=(upload_file_dest, upload_filename), timeout=-1, result_ttl=5000)
         job_key = job.get_id()
         print(job_key)
-        job2 = Job.fetch(job_key, connection=conn)
-        print(job2.get_status())
 
         return home(message='File queued, check results page later')
 

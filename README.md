@@ -39,7 +39,16 @@ Finally, in another window start the Flask app
 flask run
 ```
 
-### Clearing .potfile (assuming similar installation w/ Homebrew)
+### Other helpful commands
+Clearing .potfile (assuming similar installation w/ Homebrew)
 ```
 cp /dev/null ~/.hashcat/hashcat.potfile
+```
+Flushing redis
+```
+redis-cli flushall
+```
+Shutting down redis
+```
+redis-cli shutdown
 ```
