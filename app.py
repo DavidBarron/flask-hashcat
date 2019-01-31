@@ -1,14 +1,16 @@
 from flask import Flask, request, render_template, Response, stream_with_context
+from rq import Queue
+from rq.job import Job
+from hashcat_worker import conn
+
 import datetime
 import subprocess
 import os
 import sqlite3
-import threading
 
 DB = 'spy_challenge.db'
 
 HOME_PAGE = 'home.html'
-RESULTS_HEADER_PAGE = 'results_header.html'
 RESULTS_HISTORY_HEADER_PAGE = 'results_history_header.html'
 RESULTS_ENTRY_PAGE = 'results_entry.html'
 
@@ -21,8 +23,7 @@ POTFILE = '/Users/davidbarron/.hashcat/hashcat.potfile'
 
 app = Flask(__name__)
 
-HASH_LOCK = threading.Lock()  # hashcat is pretty resource intensive, want to only be processing 1 file at a time
-
+q = Queue('queue_hashcat', connection=conn)
 
 # CREATE TABLE tEntry
 # (
@@ -213,31 +214,24 @@ FUNCTIONS = [
 ]
 
 
-def process_file_streamed_response(upload_file_dest, filename):
-    def generate():
-        HASH_LOCK.acquire()
-        try:
-            clear_hashcat_potfile()
-            yield render_template(RESULTS_HEADER_PAGE, filename=filename)
-            status_text = ''
-            insert_db_entry(filename, 0, status_text)
-            for m, f in FUNCTIONS:
-                status_text += m
-                yield render_template(RESULTS_ENTRY_PAGE, messages=[m])
-                results = f(upload_file_dest)
-                for result in results:
-                    status_text += result + '\n'
-                yield render_template(RESULTS_ENTRY_PAGE, messages=results)
-                update_db_entry(filename, 0, status_text)  # TODO: spamming /entries page seems to fug stuff here
-                if is_done(results):
-                    break
-            status_text += 'DONE\n'
-            update_db_entry(filename, 1, status_text)
-            yield render_template(RESULTS_ENTRY_PAGE, messages=['> DONE\n'])
-        finally:
-            HASH_LOCK.release()
-
-    return Response(stream_with_context(generate()))
+def process_file(upload_file_dest, upload_filename):
+    print("Processing file...")
+    try:
+        clear_hashcat_potfile()
+        status_text = ''
+        insert_db_entry(upload_filename, 0, status_text)
+        for m, f in FUNCTIONS:
+            status_text += m
+            results = f(upload_file_dest)
+            for result in results:
+                status_text += result + '\n'
+            update_db_entry(upload_filename, 0, status_text)  # TODO: spamming /entries page seems to fug stuff here
+            if is_done(results):
+                break
+        status_text += 'DONE\n'
+        update_db_entry(upload_filename, 1, status_text)
+    finally:
+        print("Done processing file")
 
 
 @app.route('/', methods=['GET'])
@@ -246,7 +240,7 @@ def home(message=None):
 
 
 @app.route('/', methods=['POST'])
-def upload_file():
+def post_file():
     if 'file' not in request.files:
         return home()
     file = request.files['file']
@@ -258,7 +252,11 @@ def upload_file():
         return home(message='Only txt files are allowed, please try again')
     else:
         upload_file_dest, upload_filename = upload_hash_file(file)
-        return process_file_streamed_response(upload_file_dest, upload_filename)
+        job = q.enqueue(f=process_file, args=(upload_file_dest, upload_filename), timeout=-1, result_ttl=5000)
+        job_key = job.get_id()
+        print(job_key)
+
+        return home(message='File queued, check results page later')
 
 
 @app.route('/entries', methods=['GET'])
@@ -269,6 +267,13 @@ def get_entries():
             yield render_template(RESULTS_HISTORY_HEADER_PAGE, filename=entry[1])
             yield render_template(RESULTS_ENTRY_PAGE, messages=entry[3].split('\n'))
     return Response(stream_with_context(generate()))
+
+
+@app.route("/results/<job_key>", methods=['GET'])
+def get_results(job_key):
+
+    job = Job.fetch(job_key, connection=conn)
+    return job.get_status(), 200
 
 
 if __name__ == '__main__':
