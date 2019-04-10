@@ -1,4 +1,4 @@
-# flask-hashcat
+# hashcat-flask
 
 ### Description
 Simple Flask app that wraps hashcat commnd line util to perform various simple password attacks on a set of MD5 password hashes. Instructions below pertinent to OSX app install.
