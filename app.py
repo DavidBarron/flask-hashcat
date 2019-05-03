@@ -1,4 +1,5 @@
 from flask import Flask, request, render_template, Response, stream_with_context
+from flask_cors import CORS
 from rq import Queue
 from rq.job import Job
 from hashcat_worker import conn
@@ -22,6 +23,7 @@ POTFILE = '/Users/davidbarron/.hashcat/hashcat.potfile'
 
 
 app = Flask(__name__)
+CORS(app)
 
 q = Queue('queue_hashcat', connection=conn)
 
@@ -234,29 +236,25 @@ def process_file(upload_file_dest, upload_filename):
         print("Done processing file")
 
 
-@app.route('/', methods=['GET'])
-def home(message=None):
-    return render_template(HOME_PAGE, message=message)
-
-
-@app.route('/', methods=['POST'])
+@app.route('/hashcat', methods=['POST'])
 def post_file():
+    print("posting file...")
     if 'file' not in request.files:
-        return home()
+        print("No file provided")
     file = request.files['file']
     if not file:
-        return home(message='Could not fetch file, please try again')
+        print('Could not fetch file, please try again')
     elif file.filename == '':
-        return home(message='Empty file name, please try again')
+        print('Empty file name, please try again')
     elif not allowed_file(file.filename):
-        return home(message='Only txt files are allowed, please try again')
+        print('Only txt files are allowed, please try again')
     else:
-        upload_file_dest, upload_filename = upload_hash_file(file)
-        job = q.enqueue(f=process_file, args=(upload_file_dest, upload_filename), timeout=-1, result_ttl=5000)
-        job_key = job.get_id()
-        print(job_key)
+        # upload_file_dest, upload_filename = upload_hash_file(file)
+        # job = q.enqueue(f=process_file, args=(upload_file_dest, upload_filename), timeout=-1, result_ttl=5000)
+        # job_key = job.get_id()
+        # print(job_key)
 
-        return home(message='File queued, check results page later')
+        print(f"file posted: {file.filename}")
 
 
 @app.route('/entries', methods=['GET'])
