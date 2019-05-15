@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template, Response, stream_with_context
+from flask import Flask, request
 from flask_cors import CORS
 from rq import Queue
 from rq.job import Job
@@ -10,10 +10,6 @@ import os
 import sqlite3
 
 DB = 'spy_challenge.db'
-
-HOME_PAGE = 'home.html'
-RESULTS_HISTORY_HEADER_PAGE = 'results_history_header.html'
-RESULTS_ENTRY_PAGE = 'results_entry.html'
 
 WORDS = 'word_lists/words.txt'
 WORDS_REV = 'word_lists/words_rev.txt'
@@ -259,12 +255,7 @@ def post_file():
 
 @app.route('/entries', methods=['GET'])
 def get_entries():
-    def generate():
-        entries = select_db_entries()
-        for entry in entries:
-            yield render_template(RESULTS_HISTORY_HEADER_PAGE, filename=entry[1])
-            yield render_template(RESULTS_ENTRY_PAGE, messages=entry[3].split('\n'))
-    return Response(stream_with_context(generate()))
+    raise NotImplementedError
 
 
 @app.route("/results/<job_key>", methods=['GET'])
