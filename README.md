@@ -5,6 +5,7 @@ Simple Flask app that wraps hashcat commnd line util to perform various simple p
 
 ### Installing Dependencies
 ```
+brew install postgres
 brew install hashcat
 brew install redis
 ```
