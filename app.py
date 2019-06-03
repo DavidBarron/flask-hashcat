@@ -1,4 +1,5 @@
-from flask import Flask, request, render_template, Response, stream_with_context
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 from rq import Queue
 from rq.job import Job
 from hashcat_worker import conn
@@ -10,10 +11,6 @@ import sqlite3
 
 DB = 'spy_challenge.db'
 
-HOME_PAGE = 'home.html'
-RESULTS_HISTORY_HEADER_PAGE = 'results_history_header.html'
-RESULTS_ENTRY_PAGE = 'results_entry.html'
-
 WORDS = 'word_lists/words.txt'
 WORDS_REV = 'word_lists/words_rev.txt'
 ROCK_YOU = 'word_lists/rockyou.txt'
@@ -22,6 +19,7 @@ POTFILE = '/Users/davidbarron/.hashcat/hashcat.potfile'
 
 
 app = Flask(__name__)
+CORS(app)
 
 q = Queue('queue_hashcat', connection=conn)
 
@@ -234,46 +232,50 @@ def process_file(upload_file_dest, upload_filename):
         print("Done processing file")
 
 
-@app.route('/', methods=['GET'])
-def home(message=None):
-    return render_template(HOME_PAGE, message=message)
-
-
-@app.route('/', methods=['POST'])
+@app.route('/hashcat', methods=['POST'])
 def post_file():
+    print("posting file...")
+
     if 'file' not in request.files:
-        return home()
+        message = {'message': 'No file provided'}
+        response = jsonify(status_code=400, message=message)
+        return response
+
     file = request.files['file']
+
     if not file:
-        return home(message='Could not fetch file, please try again')
+        message = {'message': 'Could not fetch file, please try again'}
+        response = jsonify(status_code=400, message=message)
+        return response
     elif file.filename == '':
-        return home(message='Empty file name, please try again')
+        message = {'message': 'Empty file name, please try again'}
+        response = jsonify(status_code=400, message=message)
+        return response
     elif not allowed_file(file.filename):
-        return home(message='Only txt files are allowed, please try again')
+        message = {'message': 'Only txt files are allowed, please try again'}
+        response = jsonify(status_code=415, message=message)
+        return response
     else:
         upload_file_dest, upload_filename = upload_hash_file(file)
         job = q.enqueue(f=process_file, args=(upload_file_dest, upload_filename), timeout=-1, result_ttl=5000)
         job_key = job.get_id()
-        print(job_key)
-
-        return home(message='File queued, check results page later')
+        message = {'message': f"{file.filename} successfully posted", 'job_key': job_key}
+        response = jsonify(status_code=200, message=message)
+        return response
 
 
 @app.route('/entries', methods=['GET'])
 def get_entries():
-    def generate():
-        entries = select_db_entries()
-        for entry in entries:
-            yield render_template(RESULTS_HISTORY_HEADER_PAGE, filename=entry[1])
-            yield render_template(RESULTS_ENTRY_PAGE, messages=entry[3].split('\n'))
-    return Response(stream_with_context(generate()))
+    entries = select_db_entries()
+    return jsonify(entries)
 
 
 @app.route("/results/<job_key>", methods=['GET'])
 def get_results(job_key):
-
     job = Job.fetch(job_key, connection=conn)
-    return job.get_status(), 200
+    message = {'job_key': job_key, 'job_status': job.get_status()}
+    response = jsonify(status_code=200, message=message)
+    return response
 
 
 if __name__ == '__main__':
