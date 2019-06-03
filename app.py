@@ -1,4 +1,4 @@
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 from rq import Queue
 from rq.job import Job
@@ -235,34 +235,47 @@ def process_file(upload_file_dest, upload_filename):
 @app.route('/hashcat', methods=['POST'])
 def post_file():
     print("posting file...")
-    if 'file' not in request.files:
-        print("No file provided")
-    file = request.files['file']
-    if not file:
-        print('Could not fetch file, please try again')
-    elif file.filename == '':
-        print('Empty file name, please try again')
-    elif not allowed_file(file.filename):
-        print('Only txt files are allowed, please try again')
-    else:
-        # upload_file_dest, upload_filename = upload_hash_file(file)
-        # job = q.enqueue(f=process_file, args=(upload_file_dest, upload_filename), timeout=-1, result_ttl=5000)
-        # job_key = job.get_id()
-        # print(job_key)
 
-        print(f"file posted: {file.filename}")
+    if 'file' not in request.files:
+        message = {'message': 'No file provided'}
+        response = jsonify(status_code=400, message=message)
+        return response
+
+    file = request.files['file']
+
+    if not file:
+        message = {'message': 'Could not fetch file, please try again'}
+        response = jsonify(status_code=400, message=message)
+        return response
+    elif file.filename == '':
+        message = {'message': 'Empty file name, please try again'}
+        response = jsonify(status_code=400, message=message)
+        return response
+    elif not allowed_file(file.filename):
+        message = {'message': 'Only txt files are allowed, please try again'}
+        response = jsonify(status_code=415, message=message)
+        return response
+    else:
+        upload_file_dest, upload_filename = upload_hash_file(file)
+        job = q.enqueue(f=process_file, args=(upload_file_dest, upload_filename), timeout=-1, result_ttl=5000)
+        job_key = job.get_id()
+        message = {'message': f"{file.filename} successfully posted", 'job_key': job_key}
+        response = jsonify(status_code=200, message=message)
+        return response
 
 
 @app.route('/entries', methods=['GET'])
 def get_entries():
-    raise NotImplementedError
+    entries = select_db_entries()
+    return jsonify(entries)
 
 
 @app.route("/results/<job_key>", methods=['GET'])
 def get_results(job_key):
-
     job = Job.fetch(job_key, connection=conn)
-    return job.get_status(), 200
+    message = {'job_key': job_key, 'job_status': job.get_status()}
+    response = jsonify(status_code=200, message=message)
+    return response
 
 
 if __name__ == '__main__':
